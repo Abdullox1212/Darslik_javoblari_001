@@ -13,7 +13,7 @@ import asyncio
 
 
 
-API_TOKEN = '6824723033:AAGYDwhh3aK9mUXLsui7RGWW1JmHRyW_i5o'
+API_TOKEN = '8001791573:AAH1JpCZBj7_C64E4N-B0CdfBINQ_qiItlo'
 ADMINS_ID = [1921911753, 7149602547]
 
 
@@ -22,29 +22,29 @@ bot = Bot(token=API_TOKEN, parse_mode="HTML")
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 database = Database()
-
-# Foydalanuvchini registratsiya qilish jarayoni
 @dp.message_handler(commands="start")
 async def start_command(message: types.Message):
     chat_id = message.chat.id
     full_name = message.from_user.full_name
 
     # Agar foydalanuvchi registratsiyadan o'tgan bo'lsa
-    if database.get_user(chat_id):
-        user_status = database.get_user_status(chat_id)
+    user = database.get_user(chat_id)
+    if user:
+        user_status = user[4]
+        expiry_date_str = user[5]
+
         if user_status == 'False':
             await message.answer("Siz botdan foydalanishingiz uchun to'lov qilishingiz kerak.\n\nTo'lov qilish uchun admin @Abdulloh_Mirasqarov")
         else:
-            user_profile_link = f"tg://user?id={message.from_user.id}"
-            await message.answer(f"👋 Salom <b><a href='{user_profile_link}'>{full_name}</a></b>, botimizga xush kelibsiz!")
+            expiry_date = datetime.strptime(expiry_date_str, '%Y-%m-%d %H:%M:%S.%f')
+            await message.answer(f"Sizning to'lov muddatingiz: {expiry_date.date()} gacha")
             await message.answer("Bugun nima qilamiz ❓", reply_markup=main())
     else:
         # Yangi foydalanuvchini ro'yxatdan o'tkazish
-        user_profile_link = f"tg://user?id={message.from_user.id}"
-        await message.answer(f"👋 Salom <b><a href='{user_profile_link}'>{full_name}</a></b>, botimizga xush kelibsiz!")        
-        await message.answer("Botdan foydalanish uchun ro'yxatdan o'tishingiz kerak!")
-        await message.answer("Ismingizni kiriting:")
+        await message.answer(f"👋 Salom {full_name}, botimizga xush kelibsiz!")        
+        await message.answer("Botdan foydalanish uchun ro'yxatdan o'tishingiz kerak! Ismingizni kiriting:")
         await Registration.waiting_for_name.set()
+
 
 @dp.message_handler(state=Registration.waiting_for_name)
 async def process_name(message: types.Message, state: FSMContext):
@@ -83,11 +83,6 @@ async def send_admin_welcome(message: types.Message):
             pass
 
     
-# # Admin foydalanuvchini to'lov qilgan deb tasdiqlashi
-# @dp.message_handler(Text(equals="💳 To'lovni tasdiqlash"), user_id=ADMINS_ID)
-# async def payment_verification(message: types.Message):
-#     await message.answer("Foydalanuvchi chat ID sini kiriting:")
-#     await PaymentVerification.waiting_for_user_chat_id.set()
 
 
 @dp.message_handler(text="👨‍💼 Foydalanuvchilarni ko'rish")
@@ -121,26 +116,32 @@ async def process_payment_verification(message: types.Message, state: FSMContext
         await message.answer("Iltimos, to'g'ri chat ID kiriting.")
 
     await state.finish()
-
 async def check_user_status():
     while True:
         users = database.get_all_users()
         for user in users:
-            chat_id = user[3]
+            chat_id = user[1]
+            print(chat_id)
             expiry_date_str = user[5]
-
+            
             if expiry_date_str:
                 try:
-                    # Millisekundlar bo'lgan formatni qabul qilish
                     expiry_date = datetime.strptime(expiry_date_str, '%Y-%m-%d %H:%M:%S.%f')
-                    if datetime.now() > expiry_date:
+                    time_left = expiry_date - datetime.now()
+
+                    # Agar to'lov muddati tugashiga 2 kun qolgan bo'lsa
+                    if 0 < time_left.days <= 2:
+                        await bot.send_message(chat_id, "To'lov muddatingiz tugashiga 2 kundan kam vaqt qoldi. Iltimos, yana to'lov qiling.")
+                    
+                    # Agar muddati tugagan bo'lsa
+                    elif datetime.now() > expiry_date:
                         database.update_user_status(chat_id, False)
                         await bot.send_message(chat_id, "Sizning to'lov muddatingiz tugadi. Iltimos, yana to'lov qiling.\n\nTo'lob qilish uchun admin @Abdulloh_Mirasqarov")
                 except ValueError as e:
-                    # Agar format noto'g'ri bo'lsa
                     await bot.send_message(chat_id, f"Expiry date formatida xatolik bor. Administrator bilan bog'laning. ({e})")
             
-        await asyncio.sleep(86400)  # 24 soatda bir marta
+        await asyncio.sleep(43200)  # 12 soatda bir marta
+
 
 # Handler for the "📚 Darsliklar javobini ko'rish" command
 @dp.message_handler(text="📚 Darsliklar javobini ko'rish")
@@ -211,7 +212,39 @@ async def problem_handler(message: types.Message, state: FSMContext):
     else:
         await message.answer("Iltimos, to'g'ri misol tanlang.")
 
+# Foydalanuvchini qidirish
+@dp.message_handler(state=PaymentVerification.waiting_for_user_chat_id, content_types=types.ContentTypes.TEXT)
+async def process_user_search(message: types.Message, state: FSMContext):
+    user_input = message.text
+    user = None
 
+    # Foydalanuvchini chat ID bo'yicha qidirish
+    if user_input.isdigit():
+        user = database.get_user_by_chat_id(int(user_input))  # Foydalanuvchini chat ID bo'yicha olish
+    else:
+        # Agar raqam kiritilmagan bo'lsa, ismi bo'yicha qidirish
+        user = database.get_user_by_name(user_input)
+
+    if user:
+        await state.update_data(user=user)
+        await message.answer(f"Foydalanuvchi topildi: {user['name']}\nTo'lov holati: {'Tolangan' if user['paid'] else 'Tolanmagan'}\nTasdiqlash uchun 'Tasdiqlash' tugmasini bosing.")
+
+        await PaymentVerification.waiting_for_payment_confirmation.set()
+    else:
+        await message.answer("Foydalanuvchi topilmadi. Iltimos, qaytadan urinib ko'ring.")
+        await PaymentVerification.waiting_for_user_chat_id.set()
+
+# To'lovni tasdiqlash
+@dp.message_handler(state=PaymentVerification.waiting_for_payment_confirmation, content_types=types.ContentTypes.TEXT)
+async def confirm_payment(message: types.Message, state: FSMContext):
+    if message.text.lower() == "tasdiqlash":
+        data = await state.get_data()
+        user = data.get('user')
+        database.mark_user_as_paid(user['chat_id'])  # Foydalanuvchini to'lagan sifatida belgilash
+        await message.answer(f"Foydalanuvchi {user['name']} to'lov holati muvaffaqiyatli tasdiqlandi!")
+        await state.finish()
+    else:
+        await message.answer("To'lovni tasdiqlash uchun \"Tasdiqlash\" deb yozing.")
 
 
 
@@ -226,8 +259,9 @@ async def on_shutdown(dp):
 
 
 
+
+
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     loop.create_task(check_user_status())
-#   executor.start_polling(dp, skip_updates=True, on_start_up=on_start_up, on_shutdown=on_shutdown)
     executor.start_polling(dp, skip_updates=True, on_startup=on_start_up, on_shutdown=on_shutdown)
