@@ -6,7 +6,7 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
 from aiogram.utils import executor
 from database import Database
-from states import Registration, PaymentVerification, Darslik
+from states import *
 from buttons import *
 from datetime import datetime, timedelta
 import asyncio
@@ -34,22 +34,22 @@ async def start_command(message: types.Message):
         expiry_date_str = user[5]
 
         if user_status == 'False':
-            await message.answer("Siz botdan foydalanishingiz uchun to'lov qilishingiz kerak.\n\nTo'lov qilish uchun admin @Abdulloh_Mirasqarov")
+            await message.answer("Siz botdan foydalanishingiz uchun to'lov qilishingiz kerak.\n\nTo'lov qilish uchun admin @Abdulloh_Mirasqarov", protect_content=True)
         else:
             expiry_date = datetime.strptime(expiry_date_str, '%Y-%m-%d %H:%M:%S.%f')
-            await message.answer(f"Sizning to'lov muddatingiz: {expiry_date.date()} gacha")
-            await message.answer("Bugun nima qilamiz ❓", reply_markup=main())
+            await message.answer(f"Sizning to'lov muddatingiz: {expiry_date.date()} gacha", protect_content=True)
+            await message.answer("Bugun nima qilamiz ❓", reply_markup=main(), protect_content=True)
     else:
         # Yangi foydalanuvchini ro'yxatdan o'tkazish
-        await message.answer(f"👋 Salom {full_name}, botimizga xush kelibsiz!")        
-        await message.answer("Botdan foydalanish uchun ro'yxatdan o'tishingiz kerak! Ismingizni kiriting:")
+        await message.answer(f"👋 Salom {full_name}, botimizga xush kelibsiz!", protect_content=True)        
+        await message.answer("Botdan foydalanish uchun ro'yxatdan o'tishingiz kerak! Ismingizni kiriting:", protect_content=True)
         await Registration.waiting_for_name.set()
 
 
 @dp.message_handler(state=Registration.waiting_for_name)
 async def process_name(message: types.Message, state: FSMContext):
     await state.update_data(name=message.text)
-    await message.answer("Iltimos, telefon raqamingizni yuboring:", reply_markup=contact_keyboard())
+    await message.answer("Iltimos, telefon raqamingizni yuboring:", reply_markup=contact_keyboard(), protect_content=True)
     await Registration.waiting_for_phone.set()
 
 @dp.message_handler(content_types=types.ContentType.CONTACT, state=Registration.waiting_for_phone)
@@ -58,7 +58,7 @@ async def process_phone(message: types.Message, state: FSMContext):
     chat_id = message.chat.id
 
     if contact is None or contact.user_id != chat_id:
-        await message.answer("Iltimos, o'z telefon raqamingizni yuboring.")
+        await message.answer("Iltimos, o'z telefon raqamingizni yuboring.", protect_content=True)
         return
 
     data = await state.get_data()
@@ -68,7 +68,7 @@ async def process_phone(message: types.Message, state: FSMContext):
     # Foydalanuvchini bazaga qo'shish (status False)
     database.add_user(name, phone_number, chat_id)
 
-    await message.answer("Registratsiyadan muvaffaqqiyatli o'tdingiz! Endi botdan foydalanish uchun to'lov qilishingiz kerak.\n\nTo'lov qilish uchun admin @Abdulloh_Mirasqarov", reply_markup=ReplyKeyboardRemove())
+    await message.answer("Registratsiyadan muvaffaqqiyatli o'tdingiz! Endi botdan foydalanish uchun to'lov qilishingiz kerak.\n\nTo'lov qilish uchun admin @Abdulloh_Mirasqarov", reply_markup=ReplyKeyboardRemove(), protect_content=True)
     await state.finish()
 
 
@@ -78,7 +78,7 @@ async def send_admin_welcome(message: types.Message):
     user_id = message.from_user.id
     for admin_id in ADMINS_ID:
         if user_id == admin_id:
-            await message.answer(f"Salom, Hurmatli <b>{full_name}</b>! Botimizga xush kelibsiz", reply_markup=admin_buttons())
+            await message.answer(f"Salom, Hurmatli <b>{full_name}</b>! Botimizga xush kelibsiz", reply_markup=admin_buttons(), protect_content=True)
         else:
             pass
 
@@ -88,14 +88,60 @@ async def send_admin_welcome(message: types.Message):
 @dp.message_handler(text="👨‍💼 Foydalanuvchilarni ko'rish")
 async def show_users(message: types.Message):
     user_count = database.get_users_count()[0]
-    await message.answer(f"Foydalanuvchilar soni: {user_count}")
+    await message.answer(f"Foydalanuvchilar soni: {user_count}", protect_content=True)
     
     
 # Admin foydalanuvchini to'lov qilgan deb tasdiqlashi
 @dp.message_handler(text="💳 To'lovni tasdiqlash", user_id=ADMINS_ID)
 async def payment_verification(message: types.Message):
-    await message.answer("Foydalanuvchi chat ID sini kiriting:")
+    await message.answer("Foydalanuvchi chat ID sini kiriting:", protect_content=True)
     await PaymentVerification.waiting_for_user_chat_id.set()
+
+
+
+
+
+
+@dp.message_handler(text="📨 Xabar yuborish", user_id=ADMINS_ID)
+async def xabar_yutborish(message:types.Message):
+    await message.answer("Rasm yuboring:")
+    await Xabar_Yuborish.waiting_for_image.set()
+
+
+
+
+
+@dp.message_handler(state=Xabar_Yuborish.waiting_for_image, content_types=types.ContentType.PHOTO)
+async def admin_panel_image(message: types.Message, state: FSMContext):
+    photo_id = message.photo[-1].file_id
+    await state.update_data(photo_id=photo_id)
+    await message.answer("Rasm qabul qilindi. Caption yuboring: ")
+    await Xabar_Yuborish.waiting_for_message.set()
+
+@dp.message_handler(state=Xabar_Yuborish.waiting_for_message)
+async def admin_panel_caption(message: types.Message, state: FSMContext):
+    caption = message.text
+    data = await state.get_data()
+    photo_id = data['photo_id']
+    
+    # Barcha foydalanuvchilarni olish
+    chat_ids = database.get_all_chat_ids()
+    
+    # Har bir foydalanuvchiga rasm va caption yuborish
+    for chat_id in chat_ids:
+        try:
+            await bot.send_photo(chat_id=chat_id, photo=photo_id, caption=caption)
+        except Exception as e:
+            logging.error(f"Failed to send photo to {chat_id}: {e}")
+    
+    await message.answer("Rasm va caption barcha foydalanuvchilarga yuborildi.")
+    await state.finish()
+
+
+
+
+
+
 
 
 
@@ -109,7 +155,7 @@ async def process_payment_verification(message: types.Message, state: FSMContext
             database.update_user_expiry(chat_id, datetime.now() + timedelta(days=30))
 
             await message.answer(f"Foydalanuvchining to'lovi tasdiqlandi. U endi 30 kun davomida botdan foydalanishi mumkin.")
-            await bot.send_message(chat_id, "Sizning to'lovingiz tasdiqlandi. Endi botdan foydalanishingiz mumkin.\n\n/start ni bosing va bemalol foydalaning")
+            await bot.send_message(chat_id, "Sizning to'lovingiz tasdiqlandi. Endi botdan foydalanishingiz mumkin.\n\n/start ni bosing va bemalol foydalaning", protect_content=True)
         else:
             await message.answer("Bunday foydalanuvchi topilmadi.")
     except ValueError:
@@ -131,14 +177,14 @@ async def check_user_status():
 
                     # Agar to'lov muddati tugashiga 2 kun qolgan bo'lsa
                     if 0 < time_left.days <= 2:
-                        await bot.send_message(chat_id, "To'lov muddatingiz tugashiga 2 kundan kam vaqt qoldi. Iltimos, yana to'lov qiling.")
+                        await bot.send_message(chat_id, "To'lov muddatingiz tugashiga 2 kundan kam vaqt qoldi. Iltimos, yana to'lov qiling.", protect_content=True)
                     
                     # Agar muddati tugagan bo'lsa
                     elif datetime.now() > expiry_date:
                         database.update_user_status(chat_id, False)
-                        await bot.send_message(chat_id, "Sizning to'lov muddatingiz tugadi. Iltimos, yana to'lov qiling.\n\nTo'lob qilish uchun admin @Abdulloh_Mirasqarov")
+                        await bot.send_message(chat_id, "Sizning to'lov muddatingiz tugadi. Iltimos, yana to'lov qiling.\n\nTo'lov qilish uchun admin @Abdulloh_Mirasqarov", protect_content=True)
                 except ValueError as e:
-                    await bot.send_message(chat_id, f"Expiry date formatida xatolik bor. Administrator bilan bog'laning. ({e})")
+                    await bot.send_message(chat_id, f"Expiry date formatida xatolik bor. Administrator bilan bog'laning. ({e})", protect_content=True)
             
         await asyncio.sleep(43200)  # 12 soatda bir marta
 
@@ -150,10 +196,10 @@ async def darslik_handler(message: types.Message):
     user_status = database.get_user_status(chat_id)
     
     if user_status == 'True':
-        await message.answer("📔 Qaysi fan❓", reply_markup=fanlar())
+        await message.answer("📔 Qaysi fan❓", reply_markup=fanlar(), protect_content=True)
         await Darslik.chooice_fan.set()
     else:
-        await message.answer("Siz botdan foydalanishingiz uchun to'lov qilishingiz kerak.")
+        await message.answer("Siz botdan foydalanishingiz uchun to'lov qilishingiz kerak.", protect_content=True)
 
 # Handler for selecting subject
 @dp.message_handler(lambda message: message.text in subjects.keys(), state=Darslik.chooice_fan)
@@ -178,7 +224,7 @@ async def topic_handler(message: types.Message, state: FSMContext):
 
     if topic_name in subjects[subject_name]:
         await state.update_data(topic_name=topic_name)
-        await message.answer(f"{subject_name} -> {topic_name} uchun misol tanlang:", reply_markup=generate_problem_buttons(subject_name, topic_name))
+        await message.answer(f"{subject_name} -> {topic_name} uchun misol tanlang:", reply_markup=generate_problem_buttons(subject_name, topic_name), protect_content=True)
         await Darslik.waiting_for_problem.set()
 
 # Handler for selecting problem
@@ -205,12 +251,12 @@ async def problem_handler(message: types.Message, state: FSMContext):
         media = [types.InputMediaPhoto(media=image, caption=caption if i == 0 else "") for i, image in enumerate(images)]
         
         if media:
-            await message.answer_media_group(media)
+            await message.answer_media_group(media, protect_content=True)
         
-        await message.answer("Bosh menu:", reply_markup=main())
+        await message.answer("Bosh menu:", reply_markup=main(), protect_content=True)
         await state.finish()
     else:
-        await message.answer("Iltimos, to'g'ri misol tanlang.")
+        await message.answer("Iltimos, to'g'ri misol tanlang.", protect_content=True)
 
 # Foydalanuvchini qidirish
 @dp.message_handler(state=PaymentVerification.waiting_for_user_chat_id, content_types=types.ContentTypes.TEXT)
@@ -241,7 +287,7 @@ async def confirm_payment(message: types.Message, state: FSMContext):
         data = await state.get_data()
         user = data.get('user')
         database.mark_user_as_paid(user['chat_id'])  # Foydalanuvchini to'lagan sifatida belgilash
-        await message.answer(f"Foydalanuvchi {user['name']} to'lov holati muvaffaqiyatli tasdiqlandi!")
+        await message.answer(f"Foydalanuvchi {user['name']} to'lov holati muvaffaqiyatli tasdiqlandi!", protect_content=True)
         await state.finish()
     else:
         await message.answer("To'lovni tasdiqlash uchun \"Tasdiqlash\" deb yozing.")

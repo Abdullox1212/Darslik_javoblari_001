@@ -44,8 +44,9 @@ def generate_problem_buttons(subject_name, topic_name):
 def admin_buttons():
     buttons = [
         KeyboardButton("💳 To'lovni tasdiqlash"),
-        KeyboardButton("👨‍💼 Foydalanuvchilarni ko'rish")
+        KeyboardButton("👨‍💼 Foydalanuvchilarni ko'rish"),
+        KeyboardButton("📨 Xabar yuborish")
     ]
-    return ReplyKeyboardMarkup(resize_keyboard=True).add(*buttons)
+    return ReplyKeyboardMarkup(resize_keyboard=True, row_width=2).add(*buttons)
 
 

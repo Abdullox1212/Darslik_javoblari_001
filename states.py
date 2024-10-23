@@ -14,3 +14,8 @@ class Darslik(StatesGroup):
 class PaymentVerification(StatesGroup):
     waiting_for_user_chat_id = State()  # Foydalanuvchini ID bo'yicha qidirish
     waiting_for_payment_confirmation = State()  # To'lovni tasdiqlash
+
+
+class Xabar_Yuborish(StatesGroup):
+    waiting_for_message = State()
+    waiting_for_image = State()

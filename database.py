@@ -48,3 +48,16 @@ class Database:
 
     def get_users_count(self):
         return self.cursor.execute("SELECT COUNT(*) FROM users").fetchone()
+    
+    
+    def get_all_chat_ids(self):
+
+
+    # SQL query to get all chat_ids from the users table
+        self.cursor.execute("SELECT chat_id FROM users")
+
+    # Fetch all results and extract chat_ids
+        chat_ids = [row[0] for row in self.cursor.fetchall()]
+
+
+        return chat_ids    
