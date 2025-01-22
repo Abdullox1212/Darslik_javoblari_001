@@ -13,7 +13,8 @@ import asyncio
 
 
 
-API_TOKEN = '8001791573:AAH1JpCZBj7_C64E4N-B0CdfBINQ_qiItlo'
+# API_TOKEN = '8001791573:AAH1JpCZBj7_C64E4N-B0CdfBINQ_qiItlo'
+API_TOKEN = '6824723033:AAFq5cP0TYi7DKvT84B2JZMyE8O2PSqOsZM'
 ADMINS_ID = [1921911753, 7149602547]
 
 
@@ -33,7 +34,7 @@ async def start_command(message: types.Message):
         user_status = user[4]
         expiry_date_str = user[5]
 
-        if user_status == 'False':
+        if user_status == False:
             await message.answer("Siz botdan foydalanishingiz uchun to'lov qilishingiz kerak.\n\nTo'lov qilish uchun admin @Abdulloh_Mirasqarov", protect_content=True)
         else:
             expiry_date = datetime.strptime(expiry_date_str, '%Y-%m-%d %H:%M:%S.%f')
@@ -167,7 +168,6 @@ async def check_user_status():
         users = database.get_all_users()
         for user in users:
             chat_id = user[1]
-            print(chat_id)
             expiry_date_str = user[5]
             
             if expiry_date_str:
@@ -182,11 +182,14 @@ async def check_user_status():
                     # Agar muddati tugagan bo'lsa
                     elif datetime.now() > expiry_date:
                         database.update_user_status(chat_id, False)
-                        await bot.send_message(chat_id, "Sizning to'lov muddatingiz tugadi. Iltimos, yana to'lov qiling.\n\nTo'lov qilish uchun admin @Abdulloh_Mirasqarov", protect_content=True)
+                        try:
+                            await bot.send_message(chat_id, "Sizning to'lov muddatingiz tugadi. Iltimos, yana to'lov qiling.\n\nTo'lov qilish uchun admin @Abdulloh_Mirasqarov", protect_content=True)
+                        except Exception as e:
+                            logging.error(f"Failed to send message to {chat_id}: {e}")
                 except ValueError as e:
                     await bot.send_message(chat_id, f"Expiry date formatida xatolik bor. Administrator bilan bog'laning. ({e})", protect_content=True)
             
-        await asyncio.sleep(43200)  # 12 soatda bir marta
+        await asyncio.sleep(43200)  # 12 soatda bir marta tekshirish
 
 
 # Handler for the "📚 Darsliklar javobini ko'rish" command
@@ -196,41 +199,54 @@ async def darslik_handler(message: types.Message):
     user_status = database.get_user_status(chat_id)
     
     if user_status == 'True':
-        await message.answer("📔 Qaysi fan❓", reply_markup=fanlar(), protect_content=True)
-        await Darslik.chooice_fan.set()
+        await message.answer("Qaysi sinf❓", reply_markup=sinflar(), protect_content=True)
+        await Darslik.chooice_sinf.set()
     else:
         await message.answer("Siz botdan foydalanishingiz uchun to'lov qilishingiz kerak.", protect_content=True)
 
-# Handler for selecting subject
-@dp.message_handler(lambda message: message.text in subjects.keys(), state=Darslik.chooice_fan)
+# Handler for selecting sinf
+@dp.message_handler(state=Darslik.chooice_sinf)
+async def sinf_handler(message: types.Message, state: FSMContext):
+    sinf_name = message.text
+    await state.update_data(sinf_name=sinf_name)
+    await message.answer("📔 Qaysi fan❓", reply_markup=fanlar(sinf_name), protect_content=True)
+    await Darslik.chooice_fan.set()
+
+@dp.message_handler(state=Darslik.chooice_fan)
 async def subject_handler(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    sinf_name = data.get("sinf_name")
     subject_name = message.text
-    await state.update_data(subject_name=subject_name)
-    await message.answer(f"{subject_name} uchun mavzuni tanlang:", reply_markup=generate_subject_buttons(subject_name))
-    await Darslik.waiting_for_mavzu.set()
+    if subject_name in subjects[sinf_name]:
+        await state.update_data(subject_name=subject_name)
+        await message.answer(f"{subject_name} uchun mavzuni tanlang:", reply_markup=generate_subject_buttons(sinf_name, subject_name))
+        await Darslik.waiting_for_mavzu.set()
+    else:
+        await message.answer("Iltimos, to'g'ri fan tanlang.", protect_content=True)
 
 # Handler for selecting topic
 @dp.message_handler(state=Darslik.waiting_for_mavzu)
 async def topic_handler(message: types.Message, state: FSMContext):
     data = await state.get_data()
+    sinf_name = data.get("sinf_name")
     subject_name = data.get("subject_name")
     topic_name = message.text
 
     # Check if "Orqaga" button was pressed
     if topic_name == "🔙 Orqaga":
-        await start_command(message)
-        await state.finish()
+        await subject_handler(message, state)
         return
 
-    if topic_name in subjects[subject_name]:
+    if topic_name in subjects[sinf_name][subject_name]:
         await state.update_data(topic_name=topic_name)
-        await message.answer(f"{subject_name} -> {topic_name} uchun misol tanlang:", reply_markup=generate_problem_buttons(subject_name, topic_name), protect_content=True)
+        await message.answer(f"{subject_name} -> {topic_name} uchun misol tanlang:", reply_markup=generate_problem_buttons(sinf_name, subject_name, topic_name), protect_content=True)
         await Darslik.waiting_for_problem.set()
 
 # Handler for selecting problem
 @dp.message_handler(state=Darslik.waiting_for_problem)
 async def problem_handler(message: types.Message, state: FSMContext):
     data = await state.get_data()
+    sinf_name = data.get("sinf_name")
     subject_name = data.get("subject_name")
     topic_name = data.get("topic_name")
     problem_name = message.text
@@ -241,7 +257,7 @@ async def problem_handler(message: types.Message, state: FSMContext):
         return
 
     # Misolni tanlash
-    selected_problem = next((item for item in subjects[subject_name][topic_name] if item["name"] == problem_name), None)
+    selected_problem = next((item for item in subjects[sinf_name][subject_name][topic_name] if item["name"] == problem_name), None)
 
     if selected_problem:
         images = selected_problem.get("images", [])

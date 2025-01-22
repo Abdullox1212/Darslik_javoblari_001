@@ -1,4 +1,5 @@
 subjects = {
+    "8-sinf": {
     "Algebra": {
         #         1-mavzu
         "Algebrik ifodalar": [
@@ -1387,4 +1388,5 @@ subjects = {
     }
 
     
+}
 }

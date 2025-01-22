@@ -6,6 +6,7 @@ class Registration(StatesGroup):
 
 
 class Darslik(StatesGroup):
+    chooice_sinf = State()  # Yangi holat qo'shildi
     chooice_fan = State()
     waiting_for_mavzu = State()
     waiting_for_problem = State()
