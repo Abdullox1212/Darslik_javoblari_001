@@ -310,6 +310,36 @@ async def confirm_payment(message: types.Message, state: FSMContext):
 
 
 
+@dp.message_handler(text="👤 User chatini tozalash", user_id=ADMINS_ID)
+async def clear_user_chat(message: types.Message):
+    await message.answer("Foydalanuvchi chat ID sini kiriting:", protect_content=True)
+    await User_Chatini_Tozalash.waiting_for_user_chat_id.set()
+
+@dp.message_handler(state=User_Chatini_Tozalash.waiting_for_user_chat_id)
+async def process_clear_user_chat(message: types.Message, state: FSMContext):
+    try:
+        chat_id = int(message.text)  # Foydalanuvchi ID sini olish
+        deleted_count = 0  # O'chirilgan xabarlar sonini sanash
+
+        for message_id in range(message.message_id, message.message_id - 500, -1):  # Oxirgi 500 ta xabarni tekshirish
+            try:
+                await bot.delete_message(chat_id, message_id)
+                deleted_count += 1
+                await asyncio.sleep(0.1)  # Telegram rate limit dan qochish
+            except Exception:
+                continue  # Agar xabar topilmasa, davom etamiz
+
+        await message.answer(f"✅ Bot yuborgan {deleted_count} ta xabar o‘chirildi.", reply_markup=admin_buttons(), protect_content=True)
+
+    except ValueError:
+        await message.answer("🚫 Noto‘g‘ri chat ID! Raqam kiriting.",reply_markup=admin_buttons())
+    except Exception as e:
+        await message.answer(f"❌ Xatolik: {e}",reply_markup=admin_buttons())
+
+    await state.finish()
+
+
+
 async def on_start_up(dp):
     for admin_id in ADMINS_ID:
         await bot.send_message(chat_id=admin_id, text='Bot ishga tushdi!')
@@ -317,7 +347,6 @@ async def on_start_up(dp):
 async def on_shutdown(dp):
     for admin_id in ADMINS_ID:
         await bot.send_message(chat_id=admin_id, text='Bot o\'chdi!')
-
 
 
 

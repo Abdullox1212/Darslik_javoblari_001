@@ -45,6 +45,7 @@ def admin_buttons():
     buttons = [
         KeyboardButton("💳 To'lovni tasdiqlash"),
         KeyboardButton("👨‍💼 Foydalanuvchilarni ko'rish"),
-        KeyboardButton("📨 Xabar yuborish")
+        KeyboardButton("📨 Xabar yuborish"),
+        KeyboardButton("👤 User chatini tozalash"),
     ]
     return ReplyKeyboardMarkup(resize_keyboard=True, row_width=2).add(*buttons)
