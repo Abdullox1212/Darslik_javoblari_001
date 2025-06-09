@@ -8,9 +8,10 @@ def contact_keyboard():
     return keyboard
 
 def main():
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
     start_button = KeyboardButton(text="📚 Darsliklar javobini ko'rish")
-    keyboard.add(start_button)
+    asoschi_button = KeyboardButton(text="👨‍🏫 Asoschi haqida")
+    keyboard.add(start_button, asoschi_button)
     return keyboard
 
 def sinflar():
